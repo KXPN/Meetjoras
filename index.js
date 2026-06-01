@@ -1,10 +1,12 @@
 'use strict';
+
 window.onerror = null;
+
 class Meetjoras {
 
   opciones = {};
 
-  selectores = {
+  selectorPorNombre = {
     chatIcono: '[data-panel-id="2"]',
     imagenes: (
       '[data-priority][data-side] [tabindex][role=region] img[src^="https://"][data-iml][alt=""]:not([jsname],[jscontroller],[aria-hidden])'
@@ -15,36 +17,34 @@ class Meetjoras {
     listaParticipanteNombre: (
       '[data-panel-container-id=sidePanel1] [data-participant-id] span'
     ),
+    notificacion: '[data-key^="notification-"]',
     mensajes: '[data-message-id]',
-    participantesListaIcono: '[data-avatar-count]',
-    reunionNombre: '[data-meeting-title]',
+    participante: '[data-participant-id][data-tile-media-id]',
+    participantesListaIcono: '[data-panel-id][data-promo-anchor-id] i',
+    participantesSinCamaraGrupoPrimerIntegrante: (
+      '[jsname][draggable=false]:not([data-emoji],[title])'
+    ),
+    reunionBotonFinalizarIcono: '.VYBDae-Bz112c-LgbsSe.VYBDae-Bz112c-LgbsSe-OWXEXe-SfQLQb-suEOdc.hk9qKe.Iootmd.vLQezd',
+    reunionNombre: '.EY8ABd-OWXEXe-TAWMXe',
     subtituloEstaPrendido: (
       '[data-is-auto-rejoin] [role=region] [role=button][data-tooltip-id][data-idom-class]:not([aria-expanded],[data-emoji],[data-promo-anchor-id],[disabled]) span[aria-hidden]'
     ),
     subtituloEstaPrendidoIcono: (
       '[data-is-auto-rejoin] [role=region] [role=button][data-tooltip-id][data-idom-class]:not([aria-expanded],[data-emoji],[data-promo-anchor-id],[disabled]) span[aria-hidden] i'
     ),
-    xpath: {
-      reunionBotonFinalizarIcono: '//i[text()="call_end"]',
-      reunionNombre: (
-        '//div[' +
-          'text()="' + window.location.pathname.substring(1) +
-        '"]'
-      ),
-    },
   };
 
   transcripcion;
 
   constructor({ opciones }) {
     this.opciones = {opciones};
-    this.opciones.selectores = this.selectores;
+    this.opciones.selectorPorNombre = this.selectorPorNombre;
     this.inicializar();
   }
 
   inicializar = () => {
     const dParticipantesListaIcono = (
-      document.querySelector(this.selectores.participantesListaIcono)
+      document.querySelector(this.selectorPorNombre.participantesListaIcono)
     );
     if (!dParticipantesListaIcono) {
       setTimeout(this.inicializar.bind(this));
@@ -56,18 +56,20 @@ class Meetjoras {
       dParticipantesListaIconoDatos.clicHecho = true;
     }
     const dListaParticipante = (
-      document.querySelector(this.selectores.listaParticipante)
+      document.querySelector(this.selectorPorNombre.listaParticipante)
     );
     if (!dListaParticipante) {
       setTimeout(this.inicializar.bind(this));
       return;
     }
     dParticipantesListaIcono.click();
-    this.transcripcion = new Meetrans(this.opciones);
+    this.transcripcion = new Transcripcion(this.opciones);
+    this.transcripcion = new GrillaParticipantesSinCamara(this.opciones);
   }
+
 }
 
-class Meetrans {
+class Transcripcion {
 
   // Configuraciones
   // Tu nombre, para mostrar cuando hablas tú, es:
@@ -89,7 +91,7 @@ class Meetrans {
 
   // Estos valores tal vez se deben cambiar si Google cambia la interfaz
   botonActivoColor = 'rgb(138, 180, 248)';
-  selectores = {};
+  selectorPorNombre = {};
 
   // De aquí para abajo no se debe configurar más
   archivoDescargado = false;
@@ -109,7 +111,7 @@ class Meetrans {
 
   constructor(opciones) {
     if (opciones !== undefined) {
-      this.selectores = opciones.selectores;
+      this.selectorPorNombre = opciones.selectorPorNombre;
       this.nombre = (opciones.transcripcion?.nombre || this.nombre);
       this.sufijo = (opciones.transcripcion?.sufijo || this.sufijo);
       this.atajosPorAccion.iniciar = (
@@ -144,14 +146,7 @@ class Meetrans {
   }
 
   insertarBotonInicio = () => {
-    let dReunionNombre = document.querySelector(this.selectores.reunionNombre);
-    if (!dReunionNombre) {
-      dReunionNombre = (
-        this
-        .ejecutarXPath(this.selectores.xpath.reunionNombre)
-        ?.parentElement
-      );
-    }
+    let dReunionNombre = document.querySelector(this.selectorPorNombre.reunionNombre);
     if (!dReunionNombre) {
       setTimeout(this.insertarBotonInicio);
       return;
@@ -162,7 +157,7 @@ class Meetrans {
     botonInicioEstilos.background = 'green';
     botonInicioEstilos.cursor = 'pointer';
     dBotonCapturar.addEventListener('click', this.capturar);
-    dReunionNombre.parentElement.appendChild(dBotonCapturar);
+    dReunionNombre.parentElement.parentElement.appendChild(dBotonCapturar);
     document.body.addEventListener('keydown', this.revisarAtajos);
     this.dBotonCapturar = dBotonCapturar;
   }
@@ -219,12 +214,12 @@ class Meetrans {
 
   cambiarSubtitulosBotonEstado = (debeEstarActivo) => {
     let dSubtituloEstaPrendido = (
-      document.querySelector(this.selectores.subtituloEstaPrendidoIcono)
+      document.querySelector(this.selectorPorNombre.subtituloEstaPrendidoIcono)
     );
     let dSubtitulosBoton = dSubtituloEstaPrendido?.parentElement?.parentElement;
     if (!dSubtitulosBoton) {
       const dSubtituloEstaPrendidoIcono = (
-        document.querySelector(this.selectores.subtituloEstaPrendido)
+        document.querySelector(this.selectorPorNombre.subtituloEstaPrendido)
       );
       dSubtitulosBoton = dSubtituloEstaPrendidoIcono.parentElement;
     }
@@ -244,20 +239,6 @@ class Meetrans {
     }
   }
 
-  ejecutarXPath = (xpath) => {
-    return (
-      document
-      .evaluate(
-        xpath,
-        document,
-        null,
-        XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null,
-      )
-      .singleNodeValue
-    );
-  }
-
   capturar = () => {
     this.cambiarSubtitulosBotonEstado(true);
     if (this.reunion.fechaYHora) {
@@ -267,18 +248,16 @@ class Meetrans {
     window.addEventListener('beforeunload', this.descargarArchivo);
     this.reunion.fechaYHora = this.obtenerFechaYHoraActualSinPuntuacion();
     const dListaParticipantes = (
-      document.querySelectorAll(this.selectores.listaParticipante)
+      document.querySelectorAll(this.selectorPorNombre.listaParticipante)
     );
     dListaParticipantes.forEach(this.agregarParticipante);
     const reunionNombre = (
-      (
-        document
-        .querySelector(this.selectores.reunionNombre)
-        ?.dataset
-        ?.meetingTitle
-      ) ||
-      ''
+      document.querySelector(this.selectorPorNombre.reunionNombre).innerText
     );
+    const reunionCodigo = this.reunion.codigo;
+    if (reunionCodigo === reunionNombre) {
+      reunionNombre = '';
+    }
     const inicioMensaje = (
       'En ' +
       this.obtenerFechaActualSinPuntuacion() +
@@ -287,16 +266,14 @@ class Meetrans {
       (reunionNombre ? (' "' + reunionNombre + '"') : '') +
       ' ' +
       'con código ' +
-      '"' + this.reunion.codigo + '" ' +
+      '"' + reunionCodigo + '" ' +
       'con ' +
       this.participantesNombres.join(', ')
     );
     this.guardarSistemaIntervencion(inicioMensaje);
     this.reunion.nombre = reunionNombre;
     const dBotonColgar = (
-      this
-      .ejecutarXPath(this.selectores.xpath.reunionBotonFinalizarIcono)
-      .parentElement
+      document.querySelector(this.selectorPorNombre.reunionBotonFinalizarIcono)
     );
     dBotonColgar.addEventListener('click', this.descargarArchivo);
     this.subtitulosIntervalo = setInterval(this.actualizar);
@@ -304,7 +281,7 @@ class Meetrans {
   }
 
   actualizar = () => {
-    const dImagenes = document.querySelectorAll(this.selectores.imagenes);
+    const dImagenes = document.querySelectorAll(this.selectorPorNombre.imagenes);
     dImagenes.forEach(this.actualizarIntervenciones);
   }
 
@@ -347,7 +324,7 @@ class Meetrans {
       .replace(
         (
           document
-          .querySelector(this.selectores.listaParticipanteNombre)
+          .querySelector(this.selectorPorNombre.listaParticipanteNombre)
           .innerText
         ),
         this.nombre,
@@ -388,20 +365,20 @@ class Meetrans {
   marcarMensajesComoAgregados = () => {
     (
       document
-      .querySelectorAll(this.selectores.mensajes)
+      .querySelectorAll(this.selectorPorNombre.mensajes)
       .forEach((dMensaje) => {dMensaje.agregado = true})
     );
   }
 
   capturarMensajes = () => {
-    let dChatIcono = document.querySelector(this.selectores.chatIcono);
+    let dChatIcono = document.querySelector(this.selectorPorNombre.chatIcono);
     if (dChatIcono.ariaExpanded) {
       dChatIcono.click();
       dChatIcono.click();
     }
     (
       document
-      .querySelectorAll(this.selectores.mensajes)
+      .querySelectorAll(this.selectorPorNombre.mensajes)
       .forEach(this.guardarIntervencionMensaje)
     );
   }
@@ -523,6 +500,231 @@ class Meetrans {
   }
 
 }
+
+class GrillaParticipantesSinCamara {
+
+  selectoresPorNombre = {};
+
+  participantes = [];
+  participantesPorNombre = {};
+  participantesConCamaraPorNombre = {};
+  participantesSinCamaraGrupoTexto = '';
+  participantesSinCamaraGrupoAnchura = '';
+
+  constructor() {
+    this.inicializar();
+  }
+
+  inicializar = () => {
+    const dParticipantesListaIcono = (
+      document.querySelector(this.selectoresPorNombre.participantesListaIcono)
+    );
+    if (!dParticipantesListaIcono) {
+      setTimeout(this.inicializar.bind(this));
+      return;
+    }
+    dParticipantesListaIcono.click();
+    const dListaParticipante = (
+      document.querySelector(this.selectoresPorNombre.listaParticipante)
+    );
+    if (!dListaParticipante) {
+      setTimeout(this.inicializar.bind(this));
+      return;
+    }
+    dParticipantesListaIcono.click();
+    this.intervalo = setInterval(this.revisarCambios.bind(this));
+  }
+
+  revisarCambios = () => {
+    // Oculta ventana de micrófono silenciado por el sistema
+    document.querySelector('[data-is-persistent]')?.remove();
+    const dParticipantesSinCamaraGrupoPrimerIntegrante = (
+      document
+      .querySelector(
+        this.selectoresPorNombre.participantesSinCamaraGrupoPrimerIntegrante
+      )
+    );
+    if (
+      !dParticipantesSinCamaraGrupoPrimerIntegrante ||
+      (
+        dParticipantesSinCamaraGrupoPrimerIntegrante
+        .closest('[data-participant-id]')
+      ) ||
+      (
+        dParticipantesSinCamaraGrupoPrimerIntegrante
+        .closest('[data-priority]')
+      )
+    ) {
+      return;
+    }
+    const dParticipantesSinCamaraGrupo = (
+      dParticipantesSinCamaraGrupoPrimerIntegrante.closest('[style]')
+    );
+    if (!dParticipantesSinCamaraGrupo) {
+      return;
+    }
+    const participantesSinCamaraGrupoTexto = (
+      dParticipantesSinCamaraGrupo.firstChild.innerText.trim()
+    );
+    const participantesSinCamaraGrupoDimension = (
+      dParticipantesSinCamaraGrupo.offsetWidth +
+      'x' +
+      dParticipantesSinCamaraGrupo.offsetHeight
+    );
+    let ejecucionEsPrimera = !document.querySelector('.jsGrilla');
+    if (!this.participantesSinCamaraGrupoTexto) {
+      ejecucionEsPrimera = true;
+      this.participantesSinCamaraGrupoTexto = participantesSinCamaraGrupoTexto;
+      this.participantesSinCamaraGrupoDimension = (
+        participantesSinCamaraGrupoDimension
+      );
+    }
+    let participantesSinCamaraCantidadCambio = (
+      this.participantesSinCamaraGrupoTexto !==
+      participantesSinCamaraGrupoTexto
+    );
+    let participantesSinCamaraGrupoDimensionCambio = (
+      this.participantesSinCamaraGrupoDimension !==
+      participantesSinCamaraGrupoDimension
+    );
+    const dNotificacion = (
+      document.querySelector(this.selectoresPorNombre.notificacion)
+    );
+    let hayNotificacion = (dNotificacion && !dNotificacion.dataset.fueVista);
+    if (hayNotificacion) {
+      dNotificacion.dataset.fueVista = true;
+    }
+    if (
+      !ejecucionEsPrimera &&
+      !participantesSinCamaraCantidadCambio &&
+      !participantesSinCamaraGrupoDimensionCambio &&
+      !hayNotificacion
+    ) {
+      return;
+    }
+    this.participantesSinCamaraGrupoTexto = participantesSinCamaraGrupoTexto;
+    this.participantesSinCamaraGrupoDimension = (
+      participantesSinCamaraGrupoDimension
+    );
+    this.grillarParticipantes(dParticipantesSinCamaraGrupo);
+  }
+
+  grillarParticipantes = (dParticipantesSinCamaraGrupo) => {
+    this.participantesConCamaraPorNombre = {};
+    const dParticipantes = (
+      document.querySelectorAll(this.selectoresPorNombre.participante)
+    );
+    dParticipantes.forEach(this.agregarParticipanteConCamara);
+    this.participantes = [];
+    this.participantesPorNombre = {};
+    const dListaParticipantes = (
+      document.querySelectorAll(this.selectoresPorNombre.listaParticipante)
+    );
+    dListaParticipantes.forEach(this.agregarParticipante);
+    if (!this.participantes.length) {
+      return;
+    }
+    let dGrilla = document.querySelector('.jsGrilla');
+    if (dGrilla) {
+      dGrilla.remove();
+    }
+    dGrilla = document.createElement('div');
+    dGrilla.classList.add('jsGrilla');
+    dGrilla.style.position = 'absolute';
+    dGrilla.style.width = '100%';
+    dGrilla.style.height = '100%';
+    dGrilla.style.backgroundColor = '#3c4043';
+    dGrilla.style.top = 0;
+    dGrilla.style.left = 0;
+    const participantesGrupoAnchura = dParticipantesSinCamaraGrupo.offsetWidth;
+    const participantesGrupoAltura = dParticipantesSinCamaraGrupo.offsetHeight;
+    let anchura = participantesGrupoAnchura;
+    let altura = participantesGrupoAltura;
+    let anchuraDivisor = 2;
+    let alturaDivisor = 1;
+    while (
+      (participantesGrupoAnchura / anchura) *
+      (participantesGrupoAltura / altura) <
+      this.participantes.length
+    ) {
+      anchura = participantesGrupoAnchura / anchuraDivisor;
+      altura = participantesGrupoAltura / alturaDivisor;
+      if (anchuraDivisor === alturaDivisor) {
+        anchuraDivisor++;
+      } else {
+        alturaDivisor++;
+      }
+    }
+    for (const participante of this.participantes) {
+      const dParticipante = document.createElement('div');
+      dParticipante.classList.add('jsParticipanteLampara');
+      dParticipante.style.display = 'inline-block';
+      dParticipante.style.height = (altura + 'px');
+      dParticipante.style.position = 'relative';
+      dParticipante.style.width = (anchura + 'px');
+
+      const dParticipanteImagen = participante.dImagen.cloneNode(true);
+      dParticipanteImagen.className = '';
+      dParticipanteImagen.classList.add('jsParticipanteLamparaImagen');
+      dParticipanteImagen.style.float = 'left';
+      dParticipanteImagen.style.height = 'initial';
+      dParticipanteImagen.style.width = ((anchura / 2) + 'px');
+      dParticipante.appendChild(dParticipanteImagen);
+
+      const dParticipanteAudio = participante.dAudio.cloneNode(true);
+      dParticipanteAudio.className = '';
+      dParticipanteAudio.classList.add('jsParticipanteLamparaAudio');
+      dParticipanteAudio.style.transform = 'scale(0.5)';
+      dParticipante.appendChild(dParticipanteAudio);
+
+      const dParticipanteNombre = document.createElement('span');
+      dParticipanteNombre.classList.add('jsParticipanteLamparaNombre');
+      dParticipanteNombre.textContent = participante.nombre;
+      dParticipanteNombre.style.background = 'rgba(0, 0, 0, .8)';
+      dParticipanteNombre.style.color = 'white';
+      dParticipanteNombre.style.left = '0';
+      dParticipanteNombre.style.position = 'absolute';
+      dParticipanteNombre.style.top = '0';
+      dParticipante.appendChild(dParticipanteNombre);
+
+      dGrilla.appendChild(dParticipante);
+    }
+    dParticipantesSinCamaraGrupo.appendChild(dGrilla);
+  }
+
+  agregarParticipanteConCamara = (dParticipante) => {
+    const dParticipanteNombre = (
+      dParticipante.innerText.split('\n').pop().trim()
+    );
+    if (!dParticipanteNombre) {
+      return;
+    }
+    const dParticipanteVideo = dParticipante.querySelector('video');
+    if (!dParticipanteVideo) {
+      return;
+    }
+    this.participantesConCamaraPorNombre[dParticipanteNombre] = true;
+  }
+
+  agregarParticipante = (dListaParticipante) => {
+    const nombre = dListaParticipante.querySelector('span').textContent.trim();
+    if (this.participantesConCamaraPorNombre[nombre]) {
+      return;
+    }
+    if (this.participantesPorNombre[nombre]) {
+      return;
+    }
+    this.participantesPorNombre[nombre] = true;
+    const participante = {
+      nombre,
+      dImagen: dListaParticipante.querySelector('img'),
+      dAudio: dListaParticipante.querySelector('[data-tooltip-enabled]'),
+    };
+    this.participantes.push(participante);
+  }
+
+}
+
 
 if (typeof browser === 'undefined') {
   var browser = chrome;
